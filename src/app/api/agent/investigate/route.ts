@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { connectDB } from "../../../../lib/db/connection";
+import { Ticket } from "../../../../lib/db/models";
 import { runInvestigation } from "../../../../lib/agent/investigate-agent";
 import { z } from "zod";
 
@@ -32,10 +33,35 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: result.error, trace: result.trace }, { status: 500 });
     }
 
-    return NextResponse.json({ 
-      investigation: result.investigation,
-      trace: result.trace
-    });
+    if (result.investigation) {
+      const approvalStatus = result.investigation.requiresApproval ? "pending" : "not_required";
+      
+      // Update the ticket to persist the investigation results
+      await Ticket.updateOne(
+        { ticketId },
+        {
+          $set: {
+            aiInvestigation: JSON.stringify(result.investigation.evidence),
+            aiRecommendation: result.investigation.recommendation,
+            confidence: result.investigation.confidence,
+            proposedAction: result.investigation.proposedAction,
+            approvalStatus: approvalStatus,
+            category: result.investigation.category,
+            priority: result.investigation.priority,
+            status: approvalStatus === "pending" ? "awaiting_approval" : "resolved"
+          }
+        }
+      );
+
+      return NextResponse.json({ 
+        investigation: result.investigation,
+        approvalStatus: approvalStatus,
+        ticketId: ticketId,
+        trace: result.trace
+      });
+    }
+
+    return NextResponse.json({ error: "No investigation result generated" }, { status: 500 });
     
   } catch (error: any) {
     console.error("POST /api/agent/investigate error:", error);

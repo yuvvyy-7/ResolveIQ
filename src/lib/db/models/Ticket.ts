@@ -36,7 +36,7 @@ const ticketSchema = new Schema<ITicket>(
     proposedAction: { type: String },
     approvalStatus: {
       type: String,
-      enum: ["pending", "approved", "rejected", "escalated"],
+      enum: ["pending", "approved", "rejected", "escalated", "not_required"],
     },
     resolution: { type: String },
   },
