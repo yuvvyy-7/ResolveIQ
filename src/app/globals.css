@@ -49,3 +49,14 @@ body {
   scrollbar-width: thin;
   scrollbar-color: rgba(255, 255, 255, 0.1) transparent;
 }
+
+/* Force dark background on native select dropdowns */
+select {
+  background-color: #0f0f13;
+  color-scheme: dark;
+}
+
+option {
+  background-color: #0f0f13;
+  color: #d4d4d8;
+}

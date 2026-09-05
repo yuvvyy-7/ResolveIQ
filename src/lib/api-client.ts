@@ -35,3 +35,28 @@ export async function approveTicketAction(ticketId: string, approved: boolean) {
   if (!res.ok) throw new Error(data.error || "Approval failed");
   return data;
 }
+
+export async function fetchTicketStats() {
+  const res = await fetch("/api/tickets/stats");
+  if (!res.ok) throw new Error("Failed to load ticket stats");
+  const data = await res.json();
+  return data;
+}
+
+export async function createTicket(payload: {
+  customerId: string;
+  subject: string;
+  message: string;
+  category: string;
+  priority: string;
+}) {
+  const res = await fetch("/api/tickets", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || "Failed to create ticket");
+  return data.ticket;
+}
+

@@ -6,8 +6,13 @@ import { Header } from "../components/Header";
 import { TicketQueue } from "../components/TicketQueue";
 import { CaseWorkspace } from "../components/CaseWorkspace";
 import { AIResolutionPanel } from "../components/AIResolutionPanel";
+import { AnalyticsView } from "../components/AnalyticsView";
+import { NewTicketModal } from "../components/NewTicketModal";
+
+type ActiveView = "inbox" | "analytics";
 
 export default function Dashboard() {
+  const [activeView, setActiveView] = useState<ActiveView>("inbox");
   const [tickets, setTickets] = useState<any[]>([]);
   const [activeTicket, setActiveTicket] = useState<any | null>(null);
   const [customer, setCustomer] = useState<any | null>(null);
@@ -17,7 +22,8 @@ export default function Dashboard() {
   const [investigating, setInvestigating] = useState(false);
   const [approving, setApproving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  
+  const [isNewTicketOpen, setIsNewTicketOpen] = useState(false);
+
   const [activeInvestigation, setActiveInvestigation] = useState<any | null>(null);
   const [activeTrace, setActiveTrace] = useState<any[]>([]);
 
@@ -54,7 +60,7 @@ export default function Dashboard() {
     try {
       const custData = await fetchCustomer(ticket.customerId);
       setCustomer(custData);
-      
+
       const res = await fetch(`/api/accounts/${ticket.customerId}`);
       const accData = await res.json();
       setAccount(accData.account);
@@ -72,13 +78,13 @@ export default function Dashboard() {
 
       setActiveInvestigation(res.investigation);
       setActiveTrace(res.trace || []);
-      
-      setTickets(prev => prev.map(t => 
-        t.ticketId === activeTicket.ticketId 
-          ? { ...t, ...res.investigation, approvalStatus: res.approvalStatus, status: res.approvalStatus === "pending" ? "awaiting_approval" : "resolved" } 
+
+      setTickets(prev => prev.map(t =>
+        t.ticketId === activeTicket.ticketId
+          ? { ...t, ...res.investigation, approvalStatus: res.approvalStatus, status: res.approvalStatus === "pending" ? "awaiting_approval" : "resolved" }
           : t
       ));
-      
+
       setActiveTicket((prev: any) => ({
         ...prev,
         ...res.investigation,
@@ -98,17 +104,17 @@ export default function Dashboard() {
     try {
       setApproving(true);
       setError(null);
-      
+
       await approveTicketAction(activeTicket.ticketId, approved);
-      
+
       const updatedData = await fetchTickets();
       setTickets(updatedData);
-      
+
       const updatedTicket = updatedData.find((t: any) => t.ticketId === activeTicket.ticketId);
       if (updatedTicket) {
         setActiveTicket(updatedTicket);
       }
-      
+
     } catch (err: any) {
       setError(err.message || "Approval action failed.");
     } finally {
@@ -116,42 +122,65 @@ export default function Dashboard() {
     }
   }
 
+  const openCount = tickets.filter(t => t.status === "open" || t.status === "investigating" || t.status === "awaiting_approval").length;
+
   return (
     <div className="flex flex-col h-screen bg-[#09090b] text-zinc-100 font-sans overflow-hidden selection:bg-indigo-500/30">
-      <Header />
+      <Header
+        activeView={activeView}
+        onViewChange={setActiveView}
+        onRefresh={loadTickets}
+        inboxCount={openCount}
+      />
 
       <div className="flex flex-1 overflow-hidden">
-        <TicketQueue 
-          tickets={tickets} 
-          activeTicket={activeTicket} 
-          setActiveTicket={setActiveTicket} 
-          loading={loading} 
-        />
-        
-        <div className="flex-1 flex flex-col min-w-0 bg-[#09090b] relative">
-          {error && (
-            <div className="absolute top-4 left-1/2 -translate-x-1/2 z-20 flex items-center gap-3 px-4 py-3 bg-red-950 border border-red-900/50 rounded text-red-200 text-sm shadow-lg">
-              <span>{error}</span>
-            </div>
-          )}
-          
-          <CaseWorkspace 
-            ticket={activeTicket} 
-            customer={customer} 
-            account={account}
-          />
-        </div>
+        {activeView === "inbox" ? (
+          <>
+            <TicketQueue
+              tickets={tickets}
+              activeTicket={activeTicket}
+              setActiveTicket={setActiveTicket}
+              loading={loading}
+              onNewTicket={() => setIsNewTicketOpen(true)}
+            />
 
-        <AIResolutionPanel 
-          ticket={activeTicket}
-          investigating={investigating}
-          approving={approving}
-          activeInvestigation={activeInvestigation}
-          activeTrace={activeTrace}
-          onInvestigate={handleInvestigate}
-          onApprove={handleApproval}
-        />
+            <div className="flex-1 flex flex-col min-w-0 bg-[#09090b] relative">
+              {error && (
+                <div className="absolute top-4 left-1/2 -translate-x-1/2 z-20 flex items-center gap-3 px-4 py-3 bg-red-950 border border-red-900/50 rounded text-red-200 text-sm shadow-lg">
+                  <span>{error}</span>
+                </div>
+              )}
+
+              <CaseWorkspace
+                ticket={activeTicket}
+                customer={customer}
+                account={account}
+              />
+            </div>
+
+            <AIResolutionPanel
+              ticket={activeTicket}
+              investigating={investigating}
+              approving={approving}
+              activeInvestigation={activeInvestigation}
+              activeTrace={activeTrace}
+              onInvestigate={handleInvestigate}
+              onApprove={handleApproval}
+            />
+          </>
+        ) : (
+          <AnalyticsView />
+        )}
       </div>
+
+      <NewTicketModal
+        isOpen={isNewTicketOpen}
+        onClose={() => setIsNewTicketOpen(false)}
+        onCreated={() => {
+          setIsNewTicketOpen(false);
+          loadTickets();
+        }}
+      />
     </div>
   );
 }
