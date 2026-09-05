@@ -53,6 +53,7 @@ export async function connectDB() {
   if (!cached.promise) {
     const opts = {
       bufferCommands: false, // Disable buffering to fail fast if not connected
+      dbName: "resolveiq",   // Explicitly connect to resolveiq database
     };
 
     cached.promise = mongoose.connect(MONGODB_URI, opts).then((mongoose) => {
