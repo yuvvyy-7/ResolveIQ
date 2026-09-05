@@ -1,99 +1,133 @@
-import { Type, FunctionDeclaration, Tool } from "@google/genai";
+import type Groq from "groq-sdk";
 
-export const getCustomerAccountDeclaration: FunctionDeclaration = {
-  name: "getCustomerAccount",
-  description: "Retrieves the customer record and their primary account details, including connection status and mobile status.",
-  parameters: {
-    type: Type.OBJECT,
-    properties: {
-      customerId: { type: Type.STRING, description: "The unique identifier of the customer (e.g. CUST-001)" },
+// Tool definitions in OpenAI function-calling format (compatible with Groq)
+export const resolveIqTools: Groq.Chat.ChatCompletionTool[] = [
+  {
+    type: "function",
+    function: {
+      name: "getCustomerAccount",
+      description:
+        "Retrieves the customer record and their primary account details, including connection status and mobile status.",
+      parameters: {
+        type: "object",
+        properties: {
+          customerId: {
+            type: "string",
+            description: "The unique identifier of the customer (e.g. CUST-001)",
+          },
+        },
+        required: ["customerId"],
+      },
     },
-    required: ["customerId"],
   },
-};
-
-export const getPlanDetailsDeclaration: FunctionDeclaration = {
-  name: "getPlanDetails",
-  description: "Retrieves details about a specific plan, including speed, data limits, and pricing.",
-  parameters: {
-    type: Type.OBJECT,
-    properties: {
-      planId: { type: Type.STRING, description: "The unique identifier of the plan (e.g. PLAN-BB-100)" },
+  {
+    type: "function",
+    function: {
+      name: "getPlanDetails",
+      description:
+        "Retrieves details about a specific plan, including speed, data limits, and pricing.",
+      parameters: {
+        type: "object",
+        properties: {
+          planId: {
+            type: "string",
+            description: "The unique identifier of the plan (e.g. PLAN-BB-100)",
+          },
+        },
+        required: ["planId"],
+      },
     },
-    required: ["planId"],
   },
-};
-
-export const getBillingStatusDeclaration: FunctionDeclaration = {
-  name: "getBillingStatus",
-  description: "Retrieves the billing status of a customer, including current bill, outstanding amount, and due date.",
-  parameters: {
-    type: Type.OBJECT,
-    properties: {
-      customerId: { type: Type.STRING, description: "The unique identifier of the customer" },
+  {
+    type: "function",
+    function: {
+      name: "getBillingStatus",
+      description:
+        "Retrieves the billing status of a customer, including current bill, outstanding amount, and due date.",
+      parameters: {
+        type: "object",
+        properties: {
+          customerId: {
+            type: "string",
+            description: "The unique identifier of the customer",
+          },
+        },
+        required: ["customerId"],
+      },
     },
-    required: ["customerId"],
   },
-};
-
-export const getRecentTicketsDeclaration: FunctionDeclaration = {
-  name: "getRecentTickets",
-  description: "Retrieves previous support tickets for the customer.",
-  parameters: {
-    type: Type.OBJECT,
-    properties: {
-      customerId: { type: Type.STRING, description: "The customer's ID" },
+  {
+    type: "function",
+    function: {
+      name: "getRecentTickets",
+      description: "Retrieves previous support tickets for the customer.",
+      parameters: {
+        type: "object",
+        properties: {
+          customerId: {
+            type: "string",
+            description: "The customer's ID",
+          },
+        },
+        required: ["customerId"],
+      },
     },
-    required: ["customerId"],
   },
-};
-
-export const getConversationDeclaration: FunctionDeclaration = {
-  name: "getConversation",
-  description: "Retrieves the full conversation history for a specific ticket.",
-  parameters: {
-    type: Type.OBJECT,
-    properties: {
-      ticketId: { type: Type.STRING, description: "The unique identifier of the ticket" },
+  {
+    type: "function",
+    function: {
+      name: "getConversation",
+      description: "Retrieves the full conversation history for a specific ticket.",
+      parameters: {
+        type: "object",
+        properties: {
+          ticketId: {
+            type: "string",
+            description: "The unique identifier of the ticket",
+          },
+        },
+        required: ["ticketId"],
+      },
     },
-    required: ["ticketId"],
   },
-};
-
-export const searchSupportArticlesDeclaration: FunctionDeclaration = {
-  name: "searchSupportArticles",
-  description: "Searches the internal knowledge base for relevant support articles based on keywords or categories (e.g. BILLING, CONNECTION). Always run this to find grounded evidence before resolving.",
-  parameters: {
-    type: Type.OBJECT,
-    properties: {
-      query: { type: Type.STRING, description: "Search query or keywords to find matching articles" },
-      category: { type: Type.STRING, description: "Optional category filter (e.g. 'BILLING', 'CONNECTION', 'PLAN', 'OTHER')" },
+  {
+    type: "function",
+    function: {
+      name: "searchSupportArticles",
+      description:
+        "Searches the internal knowledge base for relevant support articles based on keywords or categories (e.g. BILLING, CONNECTION). Always run this to find grounded evidence before resolving.",
+      parameters: {
+        type: "object",
+        properties: {
+          query: {
+            type: "string",
+            description: "Search query or keywords to find matching articles",
+          },
+          category: {
+            type: "string",
+            description:
+              "Optional category filter (e.g. 'BILLING', 'CONNECTION', 'PLAN', 'OTHER')",
+          },
+        },
+        required: ["query"],
+      },
     },
-    required: ["query"],
   },
-};
-
-export const getSupportArticleDeclaration: FunctionDeclaration = {
-  name: "getSupportArticle",
-  description: "Retrieves the full content of a specific support article by its ID.",
-  parameters: {
-    type: Type.OBJECT,
-    properties: {
-      articleId: { type: Type.STRING, description: "The unique ID of the article (e.g. KB-CONN-001)" },
+  {
+    type: "function",
+    function: {
+      name: "getSupportArticle",
+      description: "Retrieves the full content of a specific support article by its ID.",
+      parameters: {
+        type: "object",
+        properties: {
+          articleId: {
+            type: "string",
+            description: "The unique ID of the article (e.g. KB-CONN-001)",
+          },
+        },
+        required: ["articleId"],
+      },
     },
-    required: ["articleId"],
   },
-};
-
-// Bundle all declarations into a single GenAI Tool object
-export const resolveIqTools: Tool = {
-  functionDeclarations: [
-    getCustomerAccountDeclaration,
-    getPlanDetailsDeclaration,
-    getBillingStatusDeclaration,
-    getRecentTicketsDeclaration,
-    getConversationDeclaration,
-    searchSupportArticlesDeclaration,
-    getSupportArticleDeclaration,
-  ],
-};
+];
