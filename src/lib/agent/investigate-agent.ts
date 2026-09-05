@@ -49,6 +49,26 @@ const genAiResponseSchema: Schema = {
   required: ["decision", "confidence", "recommendation", "evidence"]
 };
 
+// Retry a Gemini API call with exponential backoff on 503 (UNAVAILABLE) errors
+async function retryWithBackoff<T>(fn: () => Promise<T>, retries = 3): Promise<T> {
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      return await fn();
+    } catch (err: any) {
+      const is503 = err?.message?.includes("503") || err?.status === 503 ||
+        err?.message?.includes("UNAVAILABLE") || err?.message?.includes("high demand");
+      if (is503 && attempt < retries) {
+        const delay = Math.pow(2, attempt) * 1000; // 1s, 2s, 4s
+        console.warn(`Gemini 503 on attempt ${attempt + 1}, retrying in ${delay}ms…`);
+        await new Promise(res => setTimeout(res, delay));
+        continue;
+      }
+      throw err;
+    }
+  }
+  throw new Error("retryWithBackoff: unreachable");
+}
+
 export async function runInvestigation(ticketId: string): Promise<{ investigation: InvestigationResult | null, trace: any[], error?: string }> {
   const trace: any[] = [];
   
@@ -92,7 +112,7 @@ Message: ${ticket.message}
       },
     });
 
-    let currentResponse = await chat.sendMessage({ message: prompt });
+    let currentResponse = await retryWithBackoff(() => chat.sendMessage({ message: prompt }));
     let iteration = 0;
 
     while (iteration < MAX_ITERATIONS) {
@@ -126,9 +146,9 @@ Message: ${ticket.message}
           functionResponses.push({ functionResponse: functionResponseObj });
         }
 
-        currentResponse = await chat.sendMessage({
+        currentResponse = await retryWithBackoff(() => chat.sendMessage({
           message: functionResponses
-        });
+        }));
       } else {
         const resultText = currentResponse.text;
         if (!resultText) {
