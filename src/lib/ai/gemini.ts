@@ -7,4 +7,4 @@ export const ai = new GoogleGenAI({
 });
 
 // Export the configured model name so it can be changed centrally
-export const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-2.0-flash";
+export const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-3.6-flash";
