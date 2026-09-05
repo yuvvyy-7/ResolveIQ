@@ -144,6 +144,7 @@ Message: ${ticket.message}`;
             arguments: toolArgs,
             success: !toolResult.error,
             resultSummary: Object.keys(toolResult).join(", "),
+            rawResult: JSON.stringify(toolResult),
           });
 
           toolResultMessages.push({
@@ -171,6 +172,14 @@ Message: ${ticket.message}`;
         .trim();
 
       const parsedData = JSON.parse(cleaned);
+
+      if (parsedData.decision !== "ESCALATE") {
+        delete parsedData.escalation;
+      }
+      if (parsedData.decision !== "ASK_FOR_INFORMATION") {
+        delete parsedData.missingInformation;
+      }
+
       let validatedResult = investigationResultSchema.parse(parsedData);
 
       // DETERMINISTIC GROUNDING CHECK: RESOLVE must cite real evidence from the trace
@@ -188,7 +197,8 @@ Message: ${ticket.message}`;
           for (const step of trace) {
             if (
               step.resultSummary.includes(ev.sourceId) ||
-              JSON.stringify(step.arguments).includes(ev.sourceId)
+              JSON.stringify(step.arguments).includes(ev.sourceId) ||
+              (step.rawResult && step.rawResult.includes(ev.sourceId))
             ) {
               foundInTrace = true;
               break;
