@@ -36,8 +36,8 @@ export function Header({ activeView, onViewChange, onRefresh, inboxCount }: Head
     <header className="flex items-center justify-between px-5 h-[60px] bg-[#09090b] border-b border-white/[0.07] shrink-0">
       <div className="flex items-center gap-8">
         <div className="flex items-center gap-3">
-          <div className="w-7 h-7 rounded-md bg-indigo-500 flex items-center justify-center">
-            <LayoutGrid className="w-4 h-4 text-white" />
+          <div className="w-8 h-8 rounded-md bg-white flex items-center justify-center p-1 overflow-hidden">
+            <img src="/logo.png" alt="ResolveIQ Logo" className="w-full h-full object-contain" />
           </div>
           <h1 className="font-bold text-[15px] text-zinc-100 tracking-tight flex items-center gap-2">
             ResolveIQ
