@@ -9,8 +9,8 @@ const ticketSchema = new Schema<ITicket>(
     message: { type: String, required: true },
     category: {
       type: String,
-      enum: ["refund", "delay", "duplicate", "general", "unknown"],
-      default: "unknown",
+      enum: ["BILLING", "CONNECTION", "PLAN", "OTHER"],
+      default: "OTHER",
     },
     priority: {
       type: String,
@@ -30,7 +30,7 @@ const ticketSchema = new Schema<ITicket>(
       ],
       default: "open",
     },
-    aiInvestigation: { type: Schema.Types.Mixed }, // Can store a string or structured tool trace object
+    aiInvestigation: { type: String }, // Stringified JSON structure for the trace
     aiRecommendation: { type: String },
     confidence: { type: Number, min: 0, max: 1 },
     proposedAction: { type: String },
@@ -41,9 +41,8 @@ const ticketSchema = new Schema<ITicket>(
     resolution: { type: String },
   },
   {
-    timestamps: true, // Automatically manages createdAt and updatedAt
+    timestamps: true,
   }
 );
 
-export const Ticket =
-  mongoose.models.Ticket || mongoose.model<ITicket>("Ticket", ticketSchema);
+export const Ticket = mongoose.models.Ticket || mongoose.model<ITicket>("Ticket", ticketSchema);

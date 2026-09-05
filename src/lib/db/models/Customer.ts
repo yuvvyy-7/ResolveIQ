@@ -7,15 +7,11 @@ const customerSchema = new Schema<ICustomer>(
     name: { type: String, required: true },
     email: { type: String, required: true },
     phone: { type: String },
-    // We explicitly define createdAt to match our interface, though timestamps: true also handles it
+    serviceType: { type: String, enum: ["broadband", "mobile", "both"], required: true },
+    accountStatus: { type: String, enum: ["active", "suspended", "closed"], required: true },
     createdAt: { type: Date, default: Date.now },
   },
-  {
-    timestamps: true, // Automatically manages createdAt and updatedAt
-  }
+  { timestamps: true }
 );
 
-// Protect against Next.js hot reload issues (OverwriteModelError)
-// by checking if the model already exists before compiling it.
-export const Customer =
-  mongoose.models.Customer || mongoose.model<ICustomer>("Customer", customerSchema);
+export const Customer = mongoose.models.Customer || mongoose.model<ICustomer>("Customer", customerSchema);

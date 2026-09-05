@@ -1,111 +1,99 @@
 import { Type, FunctionDeclaration, Tool } from "@google/genai";
 
-export const getCustomerDeclaration: FunctionDeclaration = {
-  name: "getCustomer",
-  description: "Retrieves the customer record including email and phone.",
+export const getCustomerAccountDeclaration: FunctionDeclaration = {
+  name: "getCustomerAccount",
+  description: "Retrieves the customer record and their primary account details, including connection status and mobile status.",
   parameters: {
     type: Type.OBJECT,
     properties: {
-      customerId: {
-        type: Type.STRING,
-        description: "The unique identifier of the customer (e.g. CUST-001)",
-      },
+      customerId: { type: Type.STRING, description: "The unique identifier of the customer (e.g. CUST-001)" },
     },
     required: ["customerId"],
   },
 };
 
-export const getOrderDeclaration: FunctionDeclaration = {
-  name: "getOrder",
-  description: "Retrieves the order record including items, totalAmount, status, and deliveryStatus.",
+export const getPlanDetailsDeclaration: FunctionDeclaration = {
+  name: "getPlanDetails",
+  description: "Retrieves details about a specific plan, including speed, data limits, and pricing.",
   parameters: {
     type: Type.OBJECT,
     properties: {
-      orderId: {
-        type: Type.STRING,
-        description: "The unique identifier of the order (e.g. ORDER-001)",
-      },
+      planId: { type: Type.STRING, description: "The unique identifier of the plan (e.g. PLAN-BB-100)" },
     },
-    required: ["orderId"],
+    required: ["planId"],
   },
 };
 
-export const getPaymentDeclaration: FunctionDeclaration = {
-  name: "getPayment",
-  description: "Retrieves a specific payment record including amount, status, and refundStatus.",
+export const getBillingStatusDeclaration: FunctionDeclaration = {
+  name: "getBillingStatus",
+  description: "Retrieves the billing status of a customer, including current bill, outstanding amount, and due date.",
   parameters: {
     type: Type.OBJECT,
     properties: {
-      paymentId: {
-        type: Type.STRING,
-        description: "The unique identifier of the payment (e.g. PAY-001)",
-      },
+      customerId: { type: Type.STRING, description: "The unique identifier of the customer" },
     },
-    required: ["paymentId"],
+    required: ["customerId"],
   },
 };
 
-export const getPaymentsForOrderDeclaration: FunctionDeclaration = {
-  name: "getPaymentsForOrder",
-  description: "Retrieves all payments associated with a specific order. Use this to check for duplicate payments.",
-  parameters: {
-    type: Type.OBJECT,
-    properties: {
-      orderId: {
-        type: Type.STRING,
-        description: "The unique identifier of the order (e.g. ORDER-001)",
-      },
-    },
-    required: ["orderId"],
-  },
-};
-
-export const getPreviousTicketsDeclaration: FunctionDeclaration = {
-  name: "getPreviousTickets",
+export const getRecentTicketsDeclaration: FunctionDeclaration = {
+  name: "getRecentTickets",
   description: "Retrieves previous support tickets for the customer.",
   parameters: {
     type: Type.OBJECT,
     properties: {
-      customerId: {
-        type: Type.STRING,
-        description: "The customer's ID",
-      },
-      currentTicketId: {
-        type: Type.STRING,
-        description: "The current ticket ID to exclude from the results, if applicable.",
-      },
+      customerId: { type: Type.STRING, description: "The customer's ID" },
     },
     required: ["customerId"],
   },
 };
 
-export const checkRefundEligibilityDeclaration: FunctionDeclaration = {
-  name: "checkRefundEligibility",
-  description: "Independently inspects the database to determine whether a refund is currently eligible based on policies. It does NOT execute a refund.",
+export const getConversationDeclaration: FunctionDeclaration = {
+  name: "getConversation",
+  description: "Retrieves the full conversation history for a specific ticket.",
   parameters: {
     type: Type.OBJECT,
     properties: {
-      orderId: {
-        type: Type.STRING,
-        description: "The order ID involved.",
-      },
-      paymentId: {
-        type: Type.STRING,
-        description: "The specific payment ID being checked for refund.",
-      },
+      ticketId: { type: Type.STRING, description: "The unique identifier of the ticket" },
     },
-    required: ["orderId", "paymentId"],
+    required: ["ticketId"],
+  },
+};
+
+export const searchSupportArticlesDeclaration: FunctionDeclaration = {
+  name: "searchSupportArticles",
+  description: "Searches the internal knowledge base for relevant support articles based on keywords or categories (e.g. BILLING, CONNECTION). Always run this to find grounded evidence before resolving.",
+  parameters: {
+    type: Type.OBJECT,
+    properties: {
+      query: { type: Type.STRING, description: "Search query or keywords to find matching articles" },
+      category: { type: Type.STRING, description: "Optional category filter (e.g. 'BILLING', 'CONNECTION', 'PLAN', 'OTHER')" },
+    },
+    required: ["query"],
+  },
+};
+
+export const getSupportArticleDeclaration: FunctionDeclaration = {
+  name: "getSupportArticle",
+  description: "Retrieves the full content of a specific support article by its ID.",
+  parameters: {
+    type: Type.OBJECT,
+    properties: {
+      articleId: { type: Type.STRING, description: "The unique ID of the article (e.g. KB-CONN-001)" },
+    },
+    required: ["articleId"],
   },
 };
 
 // Bundle all declarations into a single GenAI Tool object
 export const resolveIqTools: Tool = {
   functionDeclarations: [
-    getCustomerDeclaration,
-    getOrderDeclaration,
-    getPaymentDeclaration,
-    getPaymentsForOrderDeclaration,
-    getPreviousTicketsDeclaration,
-    checkRefundEligibilityDeclaration,
+    getCustomerAccountDeclaration,
+    getPlanDetailsDeclaration,
+    getBillingStatusDeclaration,
+    getRecentTicketsDeclaration,
+    getConversationDeclaration,
+    searchSupportArticlesDeclaration,
+    getSupportArticleDeclaration,
   ],
 };

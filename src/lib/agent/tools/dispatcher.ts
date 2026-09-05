@@ -12,18 +12,20 @@ export async function dispatchTool(toolName: string, args: ToolArguments): Promi
   
   try {
     switch (toolName) {
-      case "getCustomer":
-        return await handlers.getCustomer(args as any);
-      case "getOrder":
-        return await handlers.getOrder(args as any);
-      case "getPayment":
-        return await handlers.getPayment(args as any);
-      case "getPaymentsForOrder":
-        return await handlers.getPaymentsForOrder(args as any);
-      case "getPreviousTickets":
-        return await handlers.getPreviousTickets(args as any);
-      case "checkRefundEligibility":
-        return await handlers.checkRefundEligibility(args as any);
+      case "getCustomerAccount":
+        return await handlers.getCustomerAccount(args as any);
+      case "getPlanDetails":
+        return await handlers.getPlanDetails(args as any);
+      case "getBillingStatus":
+        return await handlers.getBillingStatus(args as any);
+      case "getRecentTickets":
+        return await handlers.getRecentTickets(args as any);
+      case "getConversation":
+        return await handlers.getConversation(args as any);
+      case "searchSupportArticles":
+        return await handlers.searchSupportArticles(args as any);
+      case "getSupportArticle":
+        return await handlers.getSupportArticle(args as any);
       default:
         console.warn(`[Dispatcher] Rejected unknown tool: ${toolName}`);
         return { error: `Tool ${toolName} is not recognized or not allowed.` };

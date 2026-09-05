@@ -5,84 +5,82 @@ import { Ticket } from "../db/models";
 import { Type, Schema } from "@google/genai";
 import { investigationResultSchema, InvestigationResult } from "../ai/schema";
 
-const MAX_ITERATIONS = 5;
+const MAX_ITERATIONS = 6;
 
-// The same structured output schema from Phase 4
 const genAiResponseSchema: Schema = {
   type: Type.OBJECT,
   properties: {
-    category: {
+    decision: {
       type: Type.STRING,
-      enum: ["refund", "delivery_delay", "duplicate_payment", "insufficient_information", "other"],
-      description: "The primary category of the complaint."
+      enum: ["RESOLVE", "ASK_FOR_INFORMATION", "ESCALATE"]
     },
-    priority: {
-      type: Type.STRING,
-      enum: ["low", "medium", "high", "urgent"],
-      description: "The urgency of the issue based on customer sentiment and financial impact."
-    },
-    summary: {
-      type: Type.STRING,
-      description: "A brief, 1-2 sentence summary of what the customer is asking for and what the evidence shows."
-    },
+    confidence: { type: Type.NUMBER },
+    recommendation: { type: Type.STRING },
+    draftResponse: { type: Type.STRING },
     evidence: {
       type: Type.ARRAY,
-      items: { type: Type.STRING },
-      description: "Specific facts extracted strictly from the tool results."
+      items: {
+        type: Type.OBJECT,
+        properties: {
+          sourceType: { type: Type.STRING, enum: ["ACCOUNT", "TICKET", "ARTICLE", "CONVERSATION"] },
+          sourceId: { type: Type.STRING },
+          citation: { type: Type.STRING },
+          excerpt: { type: Type.STRING }
+        },
+        required: ["sourceType", "sourceId", "citation", "excerpt"]
+      }
     },
-    recommendation: {
-      type: Type.STRING,
-      description: "The recommended resolution for the customer, based strictly on policies and evidence."
+    missingInformation: {
+      type: Type.ARRAY,
+      items: { type: Type.STRING }
     },
-    confidence: {
-      type: Type.NUMBER,
-      description: "Confidence score from 0.0 to 1.0 representing how certain the AI is."
-    },
-    proposedAction: {
-      type: Type.STRING,
-      enum: ["refund", "investigate", "request_information", "escalate", "no_action"],
-      description: "The system action that should be taken next."
-    },
-    requiresApproval: {
-      type: Type.BOOLEAN,
-      description: "True if the proposed action is consequential (like issuing a refund) and requires human approval."
+    escalation: {
+      type: Type.OBJECT,
+      properties: {
+        summary: { type: Type.STRING },
+        establishedFacts: { type: Type.ARRAY, items: { type: Type.STRING } },
+        attemptedSteps: { type: Type.ARRAY, items: { type: Type.STRING } },
+        unknowns: { type: Type.ARRAY, items: { type: Type.STRING } },
+        reason: { type: Type.STRING }
+      },
+      required: ["summary", "establishedFacts", "attemptedSteps", "unknowns", "reason"]
     }
   },
-  required: ["category", "priority", "summary", "evidence", "recommendation", "confidence", "proposedAction", "requiresApproval"]
+  required: ["decision", "confidence", "recommendation", "evidence"]
 };
 
 export async function runInvestigation(ticketId: string): Promise<{ investigation: InvestigationResult | null, trace: any[], error?: string }> {
   const trace: any[] = [];
   
   try {
-    // 1. Load the ticket from MongoDB
     const ticket = await Ticket.findOne({ ticketId }).lean();
     if (!ticket) {
       return { investigation: null, trace, error: "Ticket not found" };
     }
 
     const systemInstruction = `
-You are ResolveIQ, an AI customer support resolution assistant.
+You are ResolveIQ, an AI customer support resolution assistant for a broadband and mobile provider.
 Your job is to investigate a customer's support ticket autonomously using the provided tools.
 
 STRICT RULES:
-1. ALWAYS start by looking up the customer or order mentioned in the ticket.
-2. USE TOOLS to verify claims. NEVER invent customer, order, or payment information.
-3. Once you have gathered enough evidence, stop calling tools and provide the final structured investigation result.
-4. If a payment is eligible for a refund (according to the checkRefundEligibility tool), propose a 'refund' action and set requiresApproval to true.
-5. NEVER claim a refund was executed or completed unless the database explicitly shows it.
-6. A recommendation to refund is NOT a refund execution.
-7. For duplicate payment claims, use getPaymentsForOrder to discover all payments associated with an order, as there may be more than one.
+1. Use getConversation to read the full context of the current ticket, and getRecentTickets to see the customer's history.
+2. Look up the customer's account context using getCustomerAccount and getBillingStatus.
+3. Search for relevant knowledge base articles using searchSupportArticles, and fetch the full article using getSupportArticle. DO NOT guess the resolution steps.
+4. If the article requires specific information that is missing from the conversation or account, choose ASK_FOR_INFORMATION. Ask ONLY for the specific missing information required.
+5. If the case is complex, contradictory, exhausted troubleshooting, or uncovered by any article, choose ESCALATE.
+6. If the case is routine and covered by an article, draft a resolution grounded in that article and choose RESOLVE.
+7. Provide specific evidence citing the tools you used. Your evidence MUST use real sourceIds retrieved during your investigation (e.g. articleId, ticketId, customerId).
+8. NEVER invent information or article IDs.
 `;
 
     const prompt = `Please investigate the following customer support case:
 Ticket ID: ${ticket.ticketId}
 Customer ID: ${ticket.customerId}
 Subject: ${ticket.subject}
+Category: ${ticket.category}
 Message: ${ticket.message}
 `;
 
-    // 2. Initialize chat with Gemini
     const chat = ai.chats.create({
       model: GEMINI_MODEL,
       config: {
@@ -97,22 +95,18 @@ Message: ${ticket.message}
     let currentResponse = await chat.sendMessage({ message: prompt });
     let iteration = 0;
 
-    // 3. Tool usage loop
     while (iteration < MAX_ITERATIONS) {
       iteration++;
       
       if (currentResponse.functionCalls && currentResponse.functionCalls.length > 0) {
         const functionResponses: any[] = [];
 
-        // Process all requested tools sequentially
         for (const functionCall of currentResponse.functionCalls) {
           const toolName = functionCall.name as string;
           const toolArgs = functionCall.args as Record<string, any>;
           
-          // 4. Dispatch the tool securely
           const toolResult = await dispatchTool(toolName, toolArgs);
           
-          // 5. Append to trace
           trace.push({
             iteration,
             tool: toolName,
@@ -121,7 +115,6 @@ Message: ${ticket.message}
             resultSummary: Object.keys(toolResult).join(", ")
           });
 
-          // Add to responses array, supporting optional call ID if the SDK uses it
           const functionResponseObj: any = {
             name: toolName,
             response: toolResult
@@ -133,26 +126,67 @@ Message: ${ticket.message}
           functionResponses.push({ functionResponse: functionResponseObj });
         }
 
-        // 6. Return all tool results back to Gemini in a single message
         currentResponse = await chat.sendMessage({
           message: functionResponses
         });
       } else {
-        // The model did not request a tool, meaning it provided the final structured text
         const resultText = currentResponse.text;
         if (!resultText) {
           throw new Error("Gemini returned an empty response.");
         }
         
-        // Validate against Zod
         const parsedData = JSON.parse(resultText);
-        const validatedResult = investigationResultSchema.parse(parsedData);
+        let validatedResult = investigationResultSchema.parse(parsedData);
+        
+        // DETERMINISTIC GROUNDING CHECK
+        if (validatedResult.decision === "RESOLVE") {
+          let hasInvalidEvidence = false;
+          let failedReason = "";
+          
+          if (!validatedResult.evidence || validatedResult.evidence.length === 0) {
+            hasInvalidEvidence = true;
+            failedReason = "No evidence provided for RESOLVE decision.";
+          }
+          
+          // Verify each piece of evidence was actually retrieved
+          for (const ev of validatedResult.evidence) {
+            let foundInTrace = false;
+            for (const step of trace) {
+              if (step.resultSummary.includes(ev.sourceId) || 
+                  JSON.stringify(step.arguments).includes(ev.sourceId)) {
+                foundInTrace = true;
+                break;
+              }
+            }
+            if (!foundInTrace) {
+              hasInvalidEvidence = true;
+              failedReason = `Evidence sourceId ${ev.sourceId} was never retrieved.`;
+              break;
+            }
+          }
+          
+          if (hasInvalidEvidence) {
+            // Fail safely
+            validatedResult = {
+              decision: "ESCALATE",
+              confidence: 0,
+              recommendation: "AI safety system rejected the resolution due to unverified evidence.",
+              evidence: validatedResult.evidence,
+              escalation: {
+                summary: "The AI agent proposed a resolution but cited unverified or fabricated evidence.",
+                establishedFacts: ["Agent attempted to resolve ticket."],
+                attemptedSteps: ["Safety check"],
+                unknowns: ["Why agent hallucinated"],
+                reason: failedReason
+              }
+            };
+          }
+        }
         
         return { investigation: validatedResult, trace };
       }
     }
 
-    // 7. Hit max iterations
     trace.push({
       iteration: MAX_ITERATIONS + 1,
       error: "Maximum tool iterations reached without a final response."
@@ -160,14 +194,17 @@ Message: ${ticket.message}
     
     return {
       investigation: {
-        category: "other",
-        priority: "urgent",
-        summary: "The AI agent failed to reach a conclusion within the allowed iteration limit.",
-        evidence: ["Agent exhausted tool call limit."],
-        recommendation: "Human intervention is required to investigate this case manually.",
+        decision: "ESCALATE",
         confidence: 0,
-        proposedAction: "escalate",
-        requiresApproval: false
+        recommendation: "Agent failed to complete investigation.",
+        evidence: [],
+        escalation: {
+          summary: "The AI agent failed to reach a conclusion within the allowed iteration limit.",
+          establishedFacts: [],
+          attemptedSteps: ["Automated investigation"],
+          unknowns: ["Reason for iteration loop"],
+          reason: "Max iterations reached"
+        }
       },
       trace,
       error: "Maximum tool iterations reached."

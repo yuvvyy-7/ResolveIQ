@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { connectDB } from "../../../../../lib/db/connection";
 import { Ticket } from "../../../../../lib/db/models";
-import { executeApprovedRefund } from "../../../../../lib/resolution/refund";
 import { z } from "zod";
 
 export const runtime = "nodejs";
@@ -40,9 +39,9 @@ export async function POST(
     }
 
     // Idempotency / Already Resolved checks
-    if (ticket.status === "resolved") {
+    if (ticket.status === "resolved" || ticket.status === "escalated") {
       return NextResponse.json(
-        { error: "Ticket is already resolved.", status: "resolved" },
+        { error: "Ticket is already resolved or escalated.", status: ticket.status },
         { status: 400 }
       );
     }
@@ -82,42 +81,56 @@ export async function POST(
       });
     }
 
-    // Approved: Execute specific backend logic based on proposed action
-    if (ticket.proposedAction === "refund") {
-      // First update ticket approval status securely
-      const approvalUpdate = await Ticket.updateOne(
-        { ticketId, approvalStatus: "pending" }, // Optimistic concurrency check
-        { $set: { approvalStatus: "approved" } }
-      );
-
-      if (approvalUpdate.modifiedCount === 0) {
-        return NextResponse.json(
-          { error: "Failed to acquire approval lock or already approved." },
-          { status: 409 }
-        );
-      }
-
-      // Execute authoritative backend refund validation
-      const result = await executeApprovedRefund(ticketId);
-      return NextResponse.json(result);
-    }
-
-    // If proposedAction is something else, we reject it as not implemented
-    return NextResponse.json(
-      { error: `Backend execution for action '${ticket.proposedAction}' is not implemented.` },
-      { status: 501 }
+    // Approved: Execute specific backend logic based on proposed action (Decision)
+    // First update ticket approval status securely
+    const approvalUpdate = await Ticket.updateOne(
+      { ticketId, approvalStatus: "pending" }, // Optimistic concurrency check
+      { $set: { approvalStatus: "approved" } }
     );
 
-  } catch (error: any) {
-    console.error("POST /api/tickets/[ticketId]/approve error:", error);
-    
-    // Check if it's a known error regarding already refunded states
-    if (error.message.includes("Payment was already refunded")) {
+    if (approvalUpdate.modifiedCount === 0) {
       return NextResponse.json(
-        { error: "already_refunded", message: error.message },
+        { error: "Failed to acquire approval lock or already approved." },
         { status: 409 }
       );
     }
+
+    // Simulate backend resolution actions based on decision
+    let newStatus = "resolved";
+    let simulatedResolution = "Issue resolved successfully.";
+    
+    if (ticket.proposedAction === "RESOLVE") {
+      newStatus = "resolved";
+      simulatedResolution = "Response sent to customer.";
+    } else if (ticket.proposedAction === "ASK_FOR_INFORMATION") {
+      newStatus = "open"; // Or 'awaiting_customer' if we had that state
+      simulatedResolution = "Information request sent to customer.";
+    } else if (ticket.proposedAction === "ESCALATE") {
+      newStatus = "escalated";
+      simulatedResolution = "Ticket escalated to Tier 2 Support.";
+    }
+
+    // Finalize the ticket update
+    await Ticket.updateOne(
+      { ticketId },
+      {
+        $set: {
+          status: newStatus,
+          resolution: simulatedResolution,
+        },
+      }
+    );
+
+    return NextResponse.json({
+      success: true,
+      status: "approved",
+      action: ticket.proposedAction,
+      message: simulatedResolution,
+      newTicketStatus: newStatus
+    });
+
+  } catch (error: any) {
+    console.error("POST /api/tickets/[ticketId]/approve error:", error);
     
     return NextResponse.json(
       { error: "Approval execution failed", details: error.message },

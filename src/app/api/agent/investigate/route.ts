@@ -34,21 +34,21 @@ export async function POST(request: Request) {
     }
 
     if (result.investigation) {
-      const approvalStatus = result.investigation.requiresApproval ? "pending" : "not_required";
+      const decision = result.investigation.decision;
+      const requiresApproval = decision === "RESOLVE" || decision === "ASK_FOR_INFORMATION" || decision === "ESCALATE";
+      const approvalStatus = requiresApproval ? "pending" : "not_required";
       
       // Update the ticket to persist the investigation results
       await Ticket.updateOne(
         { ticketId },
         {
           $set: {
-            aiInvestigation: JSON.stringify(result.investigation.evidence),
+            aiInvestigation: JSON.stringify(result.investigation), // Store full structured response
             aiRecommendation: result.investigation.recommendation,
             confidence: result.investigation.confidence,
-            proposedAction: result.investigation.proposedAction,
+            proposedAction: decision,
             approvalStatus: approvalStatus,
-            category: result.investigation.category,
-            priority: result.investigation.priority,
-            status: approvalStatus === "pending" ? "awaiting_approval" : "resolved"
+            status: "awaiting_approval"
           }
         }
       );
